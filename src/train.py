@@ -36,7 +36,7 @@ def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
         feed_dict = {placeholders[i] : materialized_variables[i] for i in range(len(placeholders))}
         sess.run(assignment_op, feed_dict=feed_dict)
 
-def get_next_fractional_batch(fractional_images, fractional_labels, cur_index, batch_size):
+def get_next_batch(fractional_images, fractional_labels, cur_index, batch_size):
   start = cur_index
   end = min(cur_index+batch_size, fractional_labels.shape[0])
   next_index = end
@@ -63,7 +63,7 @@ def get_next_fractional_batch(fractional_images, fractional_labels, cur_index, b
 
 # Helper function to load feed dictionary
 def get_feed_dict(batch_size, images_raw, labels_raw):
-    images_real, labels_real, next_index = get_nextbatch(images_raw, labels_raw,
+    images_real, labels_real, next_index = get_next_batch(images_raw, labels_raw,
                                                          get_feed_dict.fractional_dataset_index,
                                                          batch_size)
     get_feed_dict.fractional_dataset_index = next_index
