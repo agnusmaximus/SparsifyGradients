@@ -62,7 +62,7 @@ def get_next_batch(fractional_images, fractional_labels, cur_index, batch_size):
   return next_batch_images, next_batch_labels, next_index % fractional_labels.shape[0]
 
 # Helper function to load feed dictionary
-def get_feed_dict(batch_size, images_raw, labels_raw, image, labels):
+def get_feed_dict(batch_size, images_raw, labels_raw, images, labels):
     images_real, labels_real, next_index = get_next_batch(images_raw, labels_raw,
                                                          get_feed_dict.fractional_dataset_index,
                                                          batch_size)
