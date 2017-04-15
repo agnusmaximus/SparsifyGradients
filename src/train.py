@@ -4,6 +4,7 @@ from __future__ import print_function
 from datetime import datetime
 
 import time
+import socket
 import binascii
 import subprocess
 import numpy as np
@@ -101,6 +102,10 @@ def train():
 
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
+        addr = socket.gethostbyname(socket.gethostname())
+
+        print("Worker %d with address %s" % (rank, str(addr)))
+
         while True:
             # Synchronize model
             synchronize_model(sess, model_variables, comm, rank, model_variables_assign, model_variables_placeholders)
