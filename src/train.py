@@ -4,6 +4,7 @@ from __future__ import print_function
 from datetime import datetime
 
 import time
+import binascii
 import subprocess
 import numpy as np
 import os
@@ -11,76 +12,71 @@ import sys
 import tensorflow as tf
 import cifar10
 import cifar10_input
-import asyncio
+import pickle
+from mpi4py import MPI
 
 FLAGS = tf.app.flags.FLAGS
 
-class MasterProcess(asyncio.Protocol):
-    def __init__(self):
-        self.transports = []
+def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
+    materialized_variables = []
+    if rank == 0:
+        print("Master materializing variables...")
 
-    def connection_made(self, transport):
-        peername = transport.get_extra_info('peername')
-        print("Commander connected to {}".format(peername))
-        self.transports.append(transport)
+        # Materialize variables
+        for variable in variables:
+            materialized_variables.append(sess.run([variable])[0])
 
-    def data_received(self, data):
-        print("Received:", data.decode())
+    materialized_variables = com.bcast(materialized_variables, root=0)
 
-    def connection_lost(self, exc):
-        pass
+    # Update variables
+    if rank != 0:
+        print("Worker setting variables")
+        assert(len(materialized_variables) == len(placeholders))
+        feed_dict = {placeholders[i] : materialized_variables[i] for i in range(len(placeholders))}
+        sess.run(assignment_op, feed_dict=feed_dict)
 
-class WorkerProcess(asyncio.Protocol):
-    def __init__(self):
-        pass
+def get_next_fractional_batch(fractional_images, fractional_labels, cur_index, batch_size):
+  start = cur_index
+  end = min(cur_index+batch_size, fractional_labels.shape[0])
+  next_index = end
+  next_batch_images = fractional_images[start:end]
+  next_batch_labels = fractional_labels[start:end]
 
-    def connection_made(self, transport):
-        peername = transport.get_extra_info('peername')
-        print("Worker connected to {}".format(peername))
-        self.transport = transport
+  # Wrap around
+  wraparound_images = np.array([])
+  wraparound_labels = np.array([])
+  if end-start < batch_size:
+    next_index = batch_size-(end-start)
+    wraparound_images = fractional_images[:next_index]
+    wraparound_labels = fractional_labels[:next_index]
 
-    def data_received(self, data):
-        pass
+  assert(wraparound_images.shape[0] == wraparound_labels.shape[0])
+  if wraparound_images.shape[0] != 0:
+    next_batch_images = np.vstack((next_batch_images, wraparound_images))
+    next_batch_labels = np.hstack((next_batch_labels, wraparound_labels))
 
-    def connection_lost(self, exc):
-        pass
+  assert(next_batch_images.shape[0] == batch_size)
+  assert(next_batch_labels.shape[0] == batch_size)
 
-def master_start_server(master_host, tf_session, tf_ops):
-    print("Master starting UDP server")
-    loop = asyncio.get_event_loop()
-    ip_addr = master_host.split(":")[0]
-    port = int(master_host.split(":")[1])
-    master = MasterProcess()
-    listen_commander = loop.create_server(
-        lambda : master,
-        ip_addr, port)
-    server = loop.run_until_complete(listen_commander)
-    return master, loop
+  return next_batch_images, next_batch_labels, next_index % fractional_labels.shape[0]
 
-def worker_start_server(master_host, tf_session, tf_ops):
-    print("Worker starting UDP client")
-    loop = asyncio.get_event_loop()
-    ip_addr = master_host.split(":")[0]
-    port = int(master_host.split(":")[1])
-    listen_command_receiver = loop.create_connection(lambda: WorkerProcess(),
-                                                     ip_addr, port)
-    _, worker_process = loop.run_until_complete(listen_command_receiver)
-    return worker_process, loop
+# Helper function to load feed dictionary
+def get_feed_dict(batch_size, images_raw, labels_raw):
+    images_real, labels_real, next_index = get_nextbatch(images_raw, labels_raw,
+                                                         get_feed_dict.fractional_dataset_index,
+                                                         batch_size)
+    get_feed_dict.fractional_dataset_index = next_index
+    assert(images_real.shape[0] == batch_size)
+    assert(labels_real.shape[0] == batch_size)
+    return {images : images_real, labels: labels_real}
 
 def train():
 
-    # Basic distributed training flags
-    assert(FLAGS.hosts != '')
-    assert(FLAGS.machine_index != -1)
-    index = FLAGS.machine_index
-    hosts = FLAGS.hosts.split(",")
-    is_master = FLAGS.machine_index == 0
-
     # Load data set
-    """images_train_raw, labels_train_raw, images_test_raw, labels_test_raw = cifar10_input.load_cifar_data_raw()
+    images_train_raw, labels_train_raw, images_test_raw, labels_test_raw = cifar10_input.load_cifar_data_raw()
     random_permutation = np.random.permutation(images_train_raw.shape[0])
     images_train_raw = images_train_raw[random_permutation]
-    labels_train_raw = labels_train_raw[random_permutation]"""
+    labels_train_raw = labels_train_raw[random_permutation]
 
     # Basic model creation for cuda convnet
     scope_name = "parameters_1"
@@ -89,18 +85,27 @@ def train():
         labels = tf.placeholder(tf.int32, shape=(None,))
         logits = cifar10.inference(images)
         loss_op = cifar10.loss(logits, labels, scope_name)
-        train_op = cifar10.train(loss_op, scope_name)
+        train_op, grads_op = cifar10.train(loss_op, scope_name)
         top_k_op = tf.nn.in_top_k(logits, labels, 1)
 
-    # UDP connection
-    if is_master:
-        master_process, loop = master_start_server(hosts[0], None, None)
-    else:
-        while True:
-            try:
-                worker_process, loop  = worker_start_server(hosts[0], None, None)
-                break
-            except:
-                time.sleep(1)
+    model_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_name)
+    model_variables_placeholders = [tf.placeholder(dtype=x.dtype, shape=x.get_shape()) for x in model_variables]
+    model_variables_assign = [tf.assign(model_variables[i], model_variables_placeholders[i]) for i in range(len(model_variables))]
 
-    loop.run_forever()
+    with tf.Session() as sess:
+
+        tf.initialize_all_variables().run()
+        tf.train.start_queue_runners(sess=sess)
+
+        get_feed_dict.fractional_dataset_index = 0
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        while True:
+            # Synchronize model
+            synchronize_model(sess, model_variables, comm, rank, model_variables_assign, model_variables_placeholders)
+
+            # Perform distributed gradient descent
+            if rank != 0:
+                fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw)
+                materialized_gradients = sess.run([grads_op])

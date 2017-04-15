@@ -32,7 +32,7 @@ import sys
 import tensorflow as tf
 import cifar10
 import cifar10_input
-import _pickle as cPickle
+import cPickle
 
 # Process images of this size. Note that this differs from the original CIFAR
 # image size of 32 x 32. If one alters this number, then the entire model
@@ -269,7 +269,7 @@ def inputs(eval_data, data_dir, batch_size):
 
 def unpickle(file):
     fo = open(file, 'rb')
-    dict = cPickle.load(fo, encoding='latin1')
+    dict = cPickle.load(fo)
     fo.close()
     return dict
 

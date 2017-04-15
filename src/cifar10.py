@@ -376,7 +376,7 @@ def train(total_loss, scope_name):
   # Apply gradients.
   apply_gradient_op = opt.apply_gradients(grads)
 
-  return apply_gradient_op
+  return apply_gradient_op, grads
 
 
 def maybe_download_and_extract():

@@ -13,12 +13,14 @@ import sys
 import tensorflow as tf
 import cifar10
 import cifar10_input
-import asyncio
+from mpi4py import MPI
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('hosts', '', 'Hosts in the cluster of the form ip:port,ip:port,ip:port')
-tf.app.flags.DEFINE_integer('machine_index', -1, 'Which host the current machine refers to in `hosts`')
-tf.app.flags.DEFINE_float('learning_rate', .1, 'learning_rate')
+
+tf.app.flags.DEFINE_float('learning_rate', .1,
+                          """Constant learning rate""")
+tf.app.flags.DEFINE_integer('num_epochs', 10,
+                            """Number of passes of data""")
 
 def main(argv=None):
     cifar10.maybe_download_and_extract()
