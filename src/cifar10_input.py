@@ -299,7 +299,7 @@ def load_cifar_data_raw(rank):
     batchsize = 10000
     train_images, train_labels = [], []
 
-    train_filenames = train_filename[rank % len(train_filenames)]
+    train_filenames = train_filenames[rank % len(train_filenames)]
 
     for x in train_filenames:
         data = unpickle(x)
