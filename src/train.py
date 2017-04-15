@@ -62,7 +62,7 @@ def get_next_batch(fractional_images, fractional_labels, cur_index, batch_size):
   return next_batch_images, next_batch_labels, next_index % fractional_labels.shape[0]
 
 # Helper function to load feed dictionary
-def get_feed_dict(batch_size, images_raw, labels_raw):
+def get_feed_dict(batch_size, images_raw, labels_raw, image, labels):
     images_real, labels_real, next_index = get_next_batch(images_raw, labels_raw,
                                                          get_feed_dict.fractional_dataset_index,
                                                          batch_size)
@@ -115,5 +115,5 @@ def train():
 
             # Perform distributed gradient descent
             if rank != 0:
-                fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw)
+                fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
                 materialized_gradients = sess.run([grads_op])
