@@ -282,6 +282,7 @@ def crop_center(img,cropx,cropy):
 def load_cifar_data_raw(rank):
   print("Loading raw cifar10 data...")
   if rank == 0:
+    test_filenames = [os.path.join(datadir, 'test_batch')]
     test_images, test_labels = [], []
     for x in test_filenames:
       data = unpickle(x)
@@ -291,10 +292,9 @@ def load_cifar_data_raw(rank):
       test_labels.extend([x for x in labels])
     print("Done")
     return None, None, np.array(test_images), np.array(test_labels)
-
+  else:
     datadir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-py')
     train_filenames = [os.path.join(datadir, 'data_batch_%d' % i) for i in range(1, 6)]
-    test_filenames = [os.path.join(datadir, 'test_batch')]
 
     batchsize = 10000
     train_images, train_labels = [], []
