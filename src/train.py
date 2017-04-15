@@ -83,8 +83,8 @@ def train():
 
     # Load data set
     images_train_raw, labels_train_raw, images_test_raw, labels_test_raw = cifar10_input.load_cifar_data_raw(rank)
-    random_permutation = np.random.permutation(images_train_raw.shape[0])
     if rank != 0:
+        random_permutation = np.random.permutation(images_train_raw.shape[0])
         images_train_raw = images_train_raw[random_permutation]
         labels_train_raw = labels_train_raw[random_permutation]
 

@@ -297,7 +297,6 @@ def load_cifar_data_raw(rank):
   else:
     train_filenames = [os.path.join(datadir, 'data_batch_%d' % i) for i in range(1, 6)]
     train_images, train_labels = [], []
-
     train_filenames = [train_filenames[rank % len(train_filenames)]]
 
     for x in train_filenames:
