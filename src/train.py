@@ -73,8 +73,16 @@ def get_feed_dict(batch_size, images_raw, labels_raw):
 
 def train():
 
+    # Communication defines
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    addr = socket.gethostbyname(socket.gethostname())
+
+    print("Worker %d with address %s" % (rank, str(addr)))
+
     # Load data set
-    images_train_raw, labels_train_raw, images_test_raw, labels_test_raw = cifar10_input.load_cifar_data_raw()
+    images_train_raw, labels_train_raw, images_test_raw, labels_test_raw = cifar10_input.load_cifar_data_raw(rank)
     random_permutation = np.random.permutation(images_train_raw.shape[0])
     images_train_raw = images_train_raw[random_permutation]
     labels_train_raw = labels_train_raw[random_permutation]
@@ -99,12 +107,6 @@ def train():
         tf.train.start_queue_runners(sess=sess)
 
         get_feed_dict.fractional_dataset_index = 0
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        addr = socket.gethostbyname(socket.gethostname())
-
-        print("Worker %d with address %s" % (rank, str(addr)))
 
         while True:
             # Synchronize model

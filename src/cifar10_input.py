@@ -279,29 +279,34 @@ def crop_center(img,cropx,cropy):
     starty = y//2-(cropy//2)
     return img[starty:starty+cropy,startx:startx+cropx,:]
 
-def load_cifar_data_raw():
-    print("Loading raw cifar10 data...")
+def load_cifar_data_raw(rank):
+  print("Loading raw cifar10 data...")
+  if rank == 0:
+    test_images, test_labels = [], []
+    for x in test_filenames:
+      data = unpickle(x)
+      images = data["data"].reshape((batchsize, 3, 32, 32)).transpose(0, 2, 3, 1)
+      labels = np.array(data["labels"]).reshape((batchsize,))
+      test_images.extend([(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images])
+      test_labels.extend([x for x in labels])
+    print("Done")
+    return None, None, np.array(test_images), np.array(test_labels)
+
     datadir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-py')
     train_filenames = [os.path.join(datadir, 'data_batch_%d' % i) for i in range(1, 6)]
     test_filenames = [os.path.join(datadir, 'test_batch')]
 
     batchsize = 10000
     train_images, train_labels = [], []
+
+    train_filenames = train_filename[rank % len(train_filenames)]
+
     for x in train_filenames:
         data = unpickle(x)
         images = data["data"].reshape((batchsize, 3, 32, 32)).transpose(0, 2, 3, 1)
         labels = np.array(data["labels"]).reshape((batchsize,))
-        train_images += [(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images]
-        train_labels += [x for x in labels]
-
-    test_images, test_labels = [], []
-    for x in test_filenames:
-        data = unpickle(x)
-        images = data["data"].reshape((batchsize, 3, 32, 32)).transpose(0, 2, 3, 1)
-        labels = np.array(data["labels"]).reshape((batchsize,))
-        test_images += [(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images]
-        test_labels += [x for x in labels]
+        train_images.extend([(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images])
+        train_labels.extend([x for x in labels])
 
     print("Done")
-
-    return tuple([np.array(x) for x in [train_images, train_labels, test_images, test_labels]])
+    return np.array(train_images), np.array(train_labels), None, None
