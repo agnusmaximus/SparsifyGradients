@@ -116,4 +116,4 @@ def train():
             # Perform distributed gradient descent
             if rank != 0:
                 fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
-                materialized_gradients = sess.run([grads_op])
+                materialized_gradients = sess.run([grads_op], feed_dict=fd)
