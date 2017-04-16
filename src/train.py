@@ -23,8 +23,8 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_bool('sparsify', True,
                          """To sparsify gradients""")
 
-tf.app.flags.DEFINE_int('cutoff', 90,
-                         """To sparsify gradients""")
+tf.app.flags.DEFINE_integer('cutoff', 90,
+                            """To sparsify gradients""")
 
 
 def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
