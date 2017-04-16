@@ -30,7 +30,7 @@ tf.app.flags.DEFINE_integer('n_iterations', 10000000,
                             """Num iterations""")
 
 def get_variable_cutoff(vals):
-    perc = 75 + 24 / (1 + 100 * np.e** np.percentile(vals, FLAGS.cutoff))
+    perc = 75 + 24 / (1 + 100 * np.e**(np.percentile(vals, FLAGS.cutoff) * 10))
     print(perc)
     return int(perc)
 
