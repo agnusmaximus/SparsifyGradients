@@ -39,7 +39,6 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
     all_gradients = com.gather(materialized_grads, root=0)
     if rank == 0:
         for worker in range(1, n_workers):
-            print("Master applying gradients for worker %d" % worker)
             if FLAGS.sparsify:
                 # Decode sparse matrix
                 worker_gradients = [np.reshape(np.asarray(x.todense()), variables[i].get_shape().as_list()) for i, x in enumerate(all_gradients[worker])]
@@ -61,7 +60,6 @@ def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
 
     # Update variables
     if rank != 0:
-        print("Worker setting variables")
         assert(len(materialized_variables) == len(placeholders))
         feed_dict = {placeholders[i] : materialized_variables[i] for i in range(len(placeholders))}
         sess.run(assignment_op, feed_dict=feed_dict)
@@ -157,8 +155,10 @@ def train():
 
         for i in range(FLAGS.n_iterations):
 
+            cur_epoch = n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+
             if rank == 0:
-                print("Epoch: %f" % (n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN))
+                print("Epoch: %f" % (cur_epoch))
 
             # Synchronize model
             t_synchronize_start = time.time()
@@ -183,7 +183,7 @@ def train():
                     evaluate_times.append(evaluate_t_end-evaluate_t_start)
                     acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
                     loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
-                    print("Time: %f, Accuracy: %f, Loss: %f" % (time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
+                    print("Epoch: %f, Time: %f, Accuracy: %f, Loss: %f" % (cur_epoch, time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
                 comm.Barrier()
 
             # Perform distributed gradient descent
