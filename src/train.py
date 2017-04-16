@@ -28,15 +28,20 @@ tf.app.flags.DEFINE_integer('cutoff', 90,
                             """To sparsify gradients""")
 tf.app.flags.DEFINE_integer('n_iterations', 10000000,
                             """Num iterations""")
+tf.app.flags.DEFINE_integer('n_epochs', 10,
+                            """Num iterations""")
 
-def get_variable_cutoff(vals):
-    perc = 75 + 24 / (1 + 100 * np.e**(np.percentile(vals, FLAGS.cutoff) * 100))
+def get_variable_cutoff(vals, epoch):
+    if epoch <= 2:
+        return 90
+    else:
+        return 75
     return int(perc)
 
-def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
+def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op, epoch):
     if FLAGS.sparsify and rank != 0:
         if FLAGS.variable_cutoff:
-            thresholds = [np.percentile(abs(x), get_variable_cutoff(abs(x))) for x in materialized_grads]
+            thresholds = [np.percentile(abs(x), get_variable_cutoff(abs(x), epoch)) for x in materialized_grads]
         else:
             thresholds = [np.percentile(abs(x), FLAGS.cutoff) for x in materialized_grads]
         sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
@@ -161,6 +166,9 @@ def train():
         for i in range(FLAGS.n_iterations):
 
             cur_epoch = n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+            
+            if cur_epoch >= FLAGS.n_epochs:
+                break
 
             # Synchronize model
             t_synchronize_start = time.time()
@@ -182,20 +190,20 @@ def train():
             if iteration % eval_iteration_interval == 0:
 
                 # Evaluate on master
-                if rank == 0:
+                if rank == 0 and iteration != 0:
                     print("Master evaluating...")
                     acc_total, loss_total = 0, 0
                     evaluate_t_start = time.time()
-                    for i in range(0, cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL, FLAGS.evaluate_batchsize):
-                        print("%d of %d" % (i, cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL))
-                        fd = get_feed_dict(FLAGS.evaluate_batchsize, images_test_raw, labels_test_raw, images, labels)
+                    for i in range(0, cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN, FLAGS.evaluate_batchsize):
+                        print("%d of %d" % (i, cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN))
+                        fd = get_feed_dict(FLAGS.evaluate_batchsize, images_train_raw, labels_train_raw, images, labels)
                         acc_p, loss_p = sess.run([top_k_op, loss_op], feed_dict=fd)
                         acc_total += np.sum(acc_p)
                         loss_total += loss_p
                     evaluate_t_end = time.time()
                     evaluate_times.append(evaluate_t_end-evaluate_t_start)
-                    acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
-                    loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+                    acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+                    loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
                     print("Epoch: %f, Time: %f, Accuracy: %f, Loss: %f" % (cur_epoch, time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
                 comm.Barrier()
 
@@ -211,7 +219,7 @@ def train():
             compute_times += t_compute_end-t_compute_start
 
             t_accumulate_gradients_start = time.time()
-            aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op)
+            aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op, int(cur_epoch))
             t_accumulate_gradients_end = time.time()
             accumulate_gradients_times += t_accumulate_gradients_end-t_accumulate_gradients_start
 

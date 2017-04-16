@@ -284,16 +284,28 @@ def load_cifar_data_raw(rank):
   batchsize = 10000
   print("Loading raw cifar10 data...")
   if rank == 0:
-    test_filenames = [os.path.join(datadir, 'test_batch')]
-    test_images, test_labels = [], []
-    for x in test_filenames:
-      data = unpickle(x)
-      images = data["data"].reshape((batchsize, 3, 32, 32)).transpose(0, 2, 3, 1)
-      labels = np.array(data["labels"]).reshape((batchsize,))
-      test_images.extend([(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images])
-      test_labels.extend([x for x in labels])
+    #test_filenames = [os.path.join(datadir, 'test_batch')]
+    #test_images, test_labels = [], []
+    #for x in test_filenames:
+    #  data = unpickle(x)
+    #  images = data["data"].reshape((batchsize, 3, 32, 32)).transpose(0, 2, 3, 1)
+    #  labels = np.array(data["labels"]).reshape((batchsize,))
+    #  test_images.extend([(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images])
+    #  test_labels.extend([x for x in labels])
+    #print("Done")
+    #return None, None, np.array(test_images), np.array(test_labels)
+    train_filenames = [os.path.join(datadir, 'data_batch_%d' % i) for i in range(1, 6)]
+    train_images, train_labels = [], []
+
+    for x in train_filenames:
+        data = unpickle(x)
+        images = data["data"].reshape((batchsize, 3, 32, 32)).transpose(0, 2, 3, 1)
+        labels = np.array(data["labels"]).reshape((batchsize,))
+        train_images.extend([(crop_center(x, cifar10.IMAGE_SIZE, cifar10.IMAGE_SIZE)-128.0)/255.0 for x in images])
+        train_labels.extend([x for x in labels])
+
     print("Done")
-    return None, None, np.array(test_images), np.array(test_labels)
+    return np.array(train_images), np.array(train_labels), None, None
   else:
     train_filenames = [os.path.join(datadir, 'data_batch_%d' % i) for i in range(1, 6)]
     train_images, train_labels = [], []
