@@ -23,8 +23,8 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
     if rank == 0:
         for worker in range(1, n_workers):
             print("Master applying gradients for worker %d" % worker)
-            fd = {apply_gradients_placeholder[i] : all_gradients[worker][i] for i in range(len(apply_gradients_placeholder))}
-            sess.run(apply_gradients_op, feed_dict=fd)
+            #fd = {apply_gradients_placeholder[i] : all_gradients[worker][i] for i in range(len(apply_gradients_placeholder))}
+            #sess.run(apply_gradients_op, feed_dict=fd)
 
 def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
     materialized_variables = []
@@ -42,7 +42,6 @@ def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
         print("Worker setting variables")
         assert(len(materialized_variables) == len(placeholders))
         feed_dict = {placeholders[i] : materialized_variables[i] for i in range(len(placeholders))}
-        print("YOO:", np.linalg.norm(materialized_variables[0]))
         sess.run(assignment_op, feed_dict=feed_dict)
 
 def get_next_batch(fractional_images, fractional_labels, cur_index, batch_size):
