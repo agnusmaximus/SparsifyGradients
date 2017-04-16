@@ -38,7 +38,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
             print("Master applying gradients for worker %d" % worker)
             if FLAGS.sparsify:
                 # Decode sparse matrix
-                worker_gradients = [reshape(x.todense(), variables[i].get_shape()) for i, x in enumerate(all_gradients[worker])]
+                worker_gradients = [np.reshape(x.todense(), variables[i].get_shape()) for i, x in enumerate(all_gradients[worker])]
             else:
                 worker_gradients = all_gradients[worker]
             fd = {apply_gradients_placeholder[i] : worker_gradients[i] for i in range(len(apply_gradients_placeholder))}
