@@ -30,8 +30,9 @@ tf.app.flags.DEFINE_integer('n_iterations', 10000000,
                             """Num iterations""")
 
 def get_variable_cutoff(vals):
-    print(np.std(vals))
-    return np.percentile(vals, FLAGS.cutoff)
+    perc = 75 + 24 / (1 + 100 * np.e** np.percentile(vals, FLAGS.cutoff))
+    print(perc)
+    return int(perc)
 
 def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
     if FLAGS.sparsify and rank != 0:
