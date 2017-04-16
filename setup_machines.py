@@ -1,6 +1,7 @@
 import sys
 import os
 import threading
+from scp import SCPClient
 import Queue
 import paramiko as pm
 
@@ -13,7 +14,7 @@ INSTALL_NFS_COMMANDS = [
     "sudo apt-get -y update",
     "sudo apt-get -y install nfs-common",
     "sudo mkdir %s" % SHARED_DIRECTORY_PATH,
-    "sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 %s:/ efs" % NFS_DNS_NAME,
+    "sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 %s:/ %s" % (NFS_DNS_NAME, SHARED_DIRECTORY_PATH),
     "sudo chmod 777 %s" % SHARED_DIRECTORY_PATH
 ]
 
@@ -83,6 +84,15 @@ def run_command(hosts, commands, quiet=False):
         if not quiet:
             print(instance, output)
 
+def transfer_keyfile_to_machines(hosts):
+    for host in hosts:
+       client = connect_client(host)
+       scp = SCPClient(client.get_transport())
+       print("SCP %s to ~" % (PATH_TO_KEYFILE))
+       scp.put(PATH_TO_KEYFILE, "~")
+       scp.close()
+       client.close()
+
 if __name__=="__main__":
     if len(sys.argv) != 2:
         print("Usage: python setup_machines.py h1,h2,h3...")
@@ -90,14 +100,20 @@ if __name__=="__main__":
 
     machines = sys.argv[1].split(",")
 
+    # Remove keyfiles
+    run_command(machines, ["sudo rm -rf ~/%s" % PATH_TO_KEYFILE.split("/")[-1]], quiet=True)
+
+    # Transfer keyfile to machines
+    transfer_keyfile_to_machines(machines)
+
     # De-install nfs
-    run_command(machines, ["rm -rf %s" % SHARED_DIRECTORY_PATH], quiet=True)
+    run_command(machines, ["sudo rm -rf %s" % SHARED_DIRECTORY_PATH], quiet=True)
 
     # Install NFS commands
     run_command(machines, INSTALL_NFS_COMMANDS, quiet=True)
 
     # Install Sparsify repo
-    run_command(machines, INSTALL_SPARSIFY_REPO_COMMANDS, quiet=True)
+    run_command([machines[0]], INSTALL_SPARSIFY_REPO_COMMANDS, quiet=True)
 
     # Install hostfile
     run_command([machines[0]], ["touch hostfile"], quiet=True)
@@ -105,3 +121,15 @@ if __name__=="__main__":
         command = list(CD_TO_SHARED_DIRECTORY)
         command.append("echo %s >> hostfile" % host)
         run_command([machines[0]], command, quiet=True)
+
+    # Add each other to hosts
+    for i, host in enumerate(machines):
+        run_command(machines, ["sudo sh -c 'echo %s >> /etc/hosts'" % host], quiet=True)
+
+    for host in machines:
+        print("ssh -i %s ubuntu@%s" % (PATH_TO_KEYFILE, host))
+
+    print("Master setup commands:")
+    print("cd %s" % SHARED_DIRECTORY_PATH)
+    print("eval `ssh-agent -s` && ssh-add ~/%s" % PATH_TO_KEYFILE.split("/")[-1])
+    print("mpiexec -n %d -hostfile ./hostfile python [file]" % (len(machines)))
