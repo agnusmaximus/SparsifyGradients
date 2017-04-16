@@ -183,7 +183,7 @@ def train():
             t_accumulate_gradients_start = time.time()
             aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op)
             t_accumulate_gradients_end = time.time()
-            accumulate_gradients_times.append(t_accumulate_gradients-end-t_accumulate_gradients_start)
+            accumulate_gradients_times.append(t_accumulate_gradients_end-t_accumulate_gradients_start)
 
             if rank == 0:
                 mean_sync = sum(sync_variables_times) / len(sync_variables_times)
