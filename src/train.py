@@ -50,7 +50,6 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
 def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
     materialized_variables = []
     if rank == 0:
-        print("Master materializing variables...")
 
         # Materialize variables
         for variable in variables:
@@ -157,9 +156,6 @@ def train():
 
             cur_epoch = n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 
-            if rank == 0:
-                print("Epoch: %f" % (cur_epoch))
-
             # Synchronize model
             t_synchronize_start = time.time()
             synchronize_model(sess, model_variables, comm, rank, model_variables_assign, model_variables_placeholders)
@@ -167,6 +163,9 @@ def train():
             sync_variables_times += t_synchronize_end-t_synchronize_start
 
             if iteration % eval_iteration_interval == 0:
+
+                if rank == 0:
+                    print("Epoch: %f" % (cur_epoch))
 
                 if rank == 0:
                     mean_sync = sync_variables_times / (iteration+1)
