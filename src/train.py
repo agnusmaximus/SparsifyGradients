@@ -22,9 +22,10 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_bool('sparsify', True,
                          """To sparsify gradients""")
-
 tf.app.flags.DEFINE_integer('cutoff', 90,
                             """To sparsify gradients""")
+tf.app.flags.DEFINE_integer('n_iterations', 200,
+                            """Num iterations""")
 
 
 def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
@@ -154,7 +155,7 @@ def train():
         accumulate_gradients_times = []
         compute_times = []
 
-        while True:
+        for i in range(FLAGS.n_iterations):
 
             if rank == 0:
                 print("Epoch: %f" % (n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN))
