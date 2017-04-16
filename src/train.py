@@ -130,13 +130,20 @@ def train():
         evaluate_times = []
         t_start = time.time()
 
+        sync_variables_times = []
+        accumulate_gradients_times = []
+        compute_times = []
+
         while True:
 
             if rank == 0:
                 print("Epoch: %f" % (n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN))
 
             # Synchronize model
+            t_synchronize_start = time.time()
             synchronize_model(sess, model_variables, comm, rank, model_variables_assign, model_variables_placeholders)
+            t_synchronize_end = time.time()
+            sync_variables_times.append(t_synchronize_end-t_synchronize_start)
 
             if iteration % eval_iteration_interval == 0:
 
@@ -159,6 +166,7 @@ def train():
                 comm.Barrier()
 
             # Perform distributed gradient descent
+            t_compute_start = time.time()
             materialized_gradients = None
             if rank != 0:
                 fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
@@ -168,8 +176,22 @@ def train():
                 #    flattened = sorted(list(grad.flatten()), key=lambda x : abs(x))
                     #for perc in [.1, .5, .8, .9, .95, .99, 1]:
                     #    print("Percentile: %f" % perc, flattened[int((len(flattened)-1) * perc)])
+            comm.Barrier()
+            t_compute_end = time.time()
+            compute_times.append(t_compute_end-t_compute_start)
 
+            t_accumulate_gradients_start = time.time()
             aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op)
+            t_accumulate_gradients_end = time.time()
+            accumulate_gradients_times.append(t_accumulate_gradients-end-t_accumulate_gradients_start)
+
+            if rank == 0:
+                mean_sync = sum(sync_variables_times) / len(sync_variables_times)
+                mean_compute = sum(compute_times) / len(compute_times)
+                mean_acc_gradients = su(accumulate_gradients_times) / len(accumulate_gradients_times)
+                print("Mean sync time: %f" % mean_sync)
+                print("Mean compute time: %f" % mean_compute)
+                print("Mean acc gradients time: %f" % mean_acc_gradients)
 
             n_examples_processed += (size-1) * FLAGS.batch_size
             iteration += 1
