@@ -143,8 +143,7 @@ def train():
         get_feed_dict.fractional_dataset_index = 0
         n_examples_processed = 0
         iteration = 0
-        eval_iteration_interval = cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / (FLAGS.batch_size * (size-1))
-        eval_iteration_interval = int(eval_iteration_interval * .2)
+        eval_iteration_interval = int(cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / (FLAGS.batch_size * (size-1)))
         evaluate_times = []
         t_start = time.time()
 
@@ -176,7 +175,7 @@ def train():
                     print("Mean acc gradients time: %f" % mean_acc_gradients)
 
                 # Evaluate on master
-                if rank == 0 and iteration != 0:
+                if rank == 0:
                     print("Master evaluating...")
                     acc_total, loss_total = 0, 0
                     evaluate_t_start = time.time()
