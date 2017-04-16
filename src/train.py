@@ -37,14 +37,14 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
             print("Master applying gradients for worker %d" % worker)
             if FLAGS.sparsify:
                 # Decode sparse matrix
-                worker_gradients = [np.reshape(x.todense(), variables[i].get_shape().as_list()) for i, x in enumerate(all_gradients[worker])]
-                #worker_gradients = [x.todense() for i, x in enumerate(all_gradients[worker])]
-                #print([x.shape for x in worker_gradients])
-                #print([v.get_shape() for v in variables])
+                #worker_gradients = [np.reshape(x.todense(), variables[i].get_shape().as_list()) for i, x in enumerate(all_gradients[worker])]
+                worker_gradients = [x.todense() for i, x in enumerate(all_gradients[worker])]
+                print([x.shape for x in worker_gradients])
+                print([v.get_shape().as_list() for v in variables])
             else:
                 worker_gradients = all_gradients[worker]
-            fd = {apply_gradients_placeholder[i] : worker_gradients[i] for i in range(len(apply_gradients_placeholder))}
-            sess.run(apply_gradients_op, feed_dict=fd)
+            #fd = {apply_gradients_placeholder[i] : worker_gradients[i] for i in range(len(apply_gradients_placeholder))}
+            #sess.run(apply_gradients_op, feed_dict=fd)
 
 def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
     materialized_variables = []
