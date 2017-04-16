@@ -29,7 +29,7 @@ tf.app.flags.DEFINE_integer('cutoff', 90,
 tf.app.flags.DEFINE_integer('n_iterations', 10000000,
                             """Num iterations""")
 
-def get_variables_cutoff(vals):
+def get_variable_cutoff(vals):
     print(np.std(vals))
     return np.percentile(vals, FLAGS.cutoff)
 
