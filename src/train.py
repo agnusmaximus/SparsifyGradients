@@ -28,7 +28,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
         percentile_cutoff = 1
         flattened = [x.flatten() for x in materialized_grad]
         thresholds = [np.percentile(x, percentile_cutoff) for x in flattened]
-        sparsified = [x * (x > threshold) for x, threshold in zip(flattened, thresholds)]
+        sparsified = [x * (abs(x) > abs(threshold)) for x, threshold in zip(flattened, thresholds)]
         materialized_grads = [sparse.csr_matrix(x) for x in flattened]
 
     all_gradients = com.gather(materialized_grads, root=0)
