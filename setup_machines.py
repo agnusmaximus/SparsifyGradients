@@ -130,6 +130,7 @@ if __name__=="__main__":
         print("ssh -i %s ubuntu@%s" % (PATH_TO_KEYFILE, host))
 
     print("Master setup commands:")
-    print("cd %s" % SHARED_DIRECTORY_PATH)
     print("eval `ssh-agent -s` && ssh-add ~/%s" % PATH_TO_KEYFILE.split("/")[-1])
+    print("ssh-keyscan %s" % " ".join(machines))
+    print("cd %s" % SHARED_DIRECTORY_PATH)
     print("mpiexec -n %d -hostfile ./hostfile python [file]" % (len(machines)))
