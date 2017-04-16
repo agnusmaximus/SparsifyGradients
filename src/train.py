@@ -30,7 +30,6 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
         sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
         sparsified_flatten = [x.flatten() for x in sparsified]
         materialized_grads = [sparse.csr_matrix(x) for x in sparsified_flatten]
-        print(materialized_grads)
 
     all_gradients = com.gather(materialized_grads, root=0)
     if rank == 0:
@@ -39,8 +38,9 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
             if FLAGS.sparsify:
                 # Decode sparse matrix
                 #worker_gradients = [np.reshape(x.todense(), variables[i].get_shape()) for i, x in enumerate(all_gradients[worker])]
-                worker_gradients = [x.todense() for i, x in enumerate(all_gradients[worker])]
+                #worker_gradients = [x.todense() for i, x in enumerate(all_gradients[worker])]
                 print([x.shape for x in worker_gradients])
+                print([v.get_shape() for v in variables])
             else:
                 worker_gradients = all_gradients[worker]
             fd = {apply_gradients_placeholder[i] : worker_gradients[i] for i in range(len(apply_gradients_placeholder))}
