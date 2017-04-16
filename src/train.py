@@ -35,7 +35,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
     if rank == 0:
         for worker in range(1, n_workers):
             print("Master applying gradients for worker %d" % worker)
-            fd = {apply_gradients_placeholder[i] : all_gradients[worker][i] for i in range(len(apply_gradients_placeholder))}
+            fd = {apply_gradients_placeholder[i] : np.reshape(all_gradients[worker][i], variables[i].get_shape()) for i in range(len(apply_gradients_placeholder))}
             sess.run(apply_gradients_op, feed_dict=fd)
 
 def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
