@@ -188,7 +188,7 @@ def train():
             if rank == 0:
                 mean_sync = sum(sync_variables_times) / len(sync_variables_times)
                 mean_compute = sum(compute_times) / len(compute_times)
-                mean_acc_gradients = su(accumulate_gradients_times) / len(accumulate_gradients_times)
+                mean_acc_gradients = sum(accumulate_gradients_times) / len(accumulate_gradients_times)
                 print("Mean sync time: %f" % mean_sync)
                 print("Mean compute time: %f" % mean_compute)
                 print("Mean acc gradients time: %f" % mean_acc_gradients)
