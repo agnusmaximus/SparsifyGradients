@@ -168,11 +168,10 @@ def train():
 
             if iteration % eval_iteration_interval == 0:
 
-
                 if rank == 0:
-                    mean_sync = sync_variables_times / iteration
-                    mean_compute = compute_times / iteration
-                    mean_acc_gradients = accumulate_gradients_times / iteration
+                    mean_sync = sync_variables_times / (iteration+1)
+                    mean_compute = compute_times / (iteration+1)
+                    mean_acc_gradients = accumulate_gradients_times / (iteration+1)
                     print("Mean sync time: %f" % mean_sync)
                     print("Mean compute time: %f" % mean_compute)
                     print("Mean acc gradients time: %f" % mean_acc_gradients)
