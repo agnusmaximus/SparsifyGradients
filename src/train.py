@@ -162,10 +162,10 @@ def train():
             t_synchronize_end = time.time()
             sync_variables_times += t_synchronize_end-t_synchronize_start
 
-            if iteration % eval_iteration_interval == 0:
+            if rank == 0 and iteration % 100 == 0:
+                print("Epoch: %f" % (cur_epoch))
 
-                if rank == 0:
-                    print("Epoch: %f" % (cur_epoch))
+            if iteration % eval_iteration_interval == 0:
 
                 if rank == 0:
                     mean_sync = sync_variables_times / (iteration+1)
