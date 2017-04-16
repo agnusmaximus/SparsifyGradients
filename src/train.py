@@ -30,7 +30,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
         all_gradients = sparsified
     length = -1
     if rank != 0:
-        length = int(len(materialized_grads) / 5)
+        length = int(len(materialized_grads) / 4)
     all_gradients = com.gather(materialized_grads[:length], root=0)
     if rank == 0:
         for worker in range(1, n_workers):
