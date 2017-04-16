@@ -24,7 +24,7 @@ tf.app.flags.DEFINE_bool('sparsify', True,
                          """To sparsify gradients""")
 tf.app.flags.DEFINE_integer('cutoff', 90,
                             """To sparsify gradients""")
-tf.app.flags.DEFINE_integer('n_iterations', 2000000000,
+tf.app.flags.DEFINE_integer('n_iterations', 10000000,
                             """Num iterations""")
 
 
