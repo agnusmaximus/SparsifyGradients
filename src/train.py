@@ -145,6 +145,7 @@ def train():
         n_examples_processed = 0
         iteration = 0
         eval_iteration_interval = cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / (FLAGS.batch_size * (size-1))
+        eval_iteration_interval = int(eval_iteration_interval * .2)
         evaluate_times = []
         t_start = time.time()
 
