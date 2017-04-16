@@ -27,7 +27,6 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
     if FLAGS.sparsify and rank != 0:
         percentile_cutoff = 90
         thresholds = [np.percentile(abs(x), percentile_cutoff) for x in materialized_grads]
-        print("THRESHOLDS:", thresholds)
         sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
         sparsified_flatten = [x.flatten() for x in sparsified]
         materialized_grads = [sparse.csr_matrix(x) for x in sparsified_flatten]
@@ -36,8 +35,11 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
     if rank == 0:
         for worker in range(1, n_workers):
             print("Master applying gradients for worker %d" % worker)
-            #fd = {apply_gradients_placeholder[i] : np.reshape(all_gradients[worker][i], variables[i].get_shape()) for i in range(len(apply_gradients_placeholder))}
-            #sess.run(apply_gradients_op, feed_dict=fd)
+            if FLAGS.sparsify:
+                # Decode sparse matrix
+                all_gradients = [x.todense().reshape(variables[i].get_shape()) for x in all_gradients]
+            fd = {apply_gradients_placeholder[i] : all_gradients[worker][i] for i in range(len(apply_gradients_placeholder))}
+            sess.run(apply_gradients_op, feed_dict=fd)
 
 def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
     materialized_variables = []
