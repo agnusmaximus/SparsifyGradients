@@ -39,6 +39,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
                 # Decode sparse matrix
                 #worker_gradients = [np.reshape(x.todense(), variables[i].get_shape().as_list()) for i, x in enumerate(all_gradients[worker])]
                 worker_gradients = [x.todense() for i, x in enumerate(all_gradients[worker])]
+                print([type(x) for x in worker_gradients])
                 print([x.shape for x in worker_gradients])
                 print([v.get_shape().as_list() for v in variables])
             else:
