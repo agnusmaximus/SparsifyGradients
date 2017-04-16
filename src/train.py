@@ -26,7 +26,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
     if FLAGS.sparsify and rank != 0:
         percentile_cutoff = .90
         thresholds = [np.percentile(x, percentile_cutoff) for x in materialized_grads]
-        sparsified = [x * x > threshold for x, threshold in zip(materialized_grads, thresholds)]
+        sparsified = [x * (x > threshold) for x, threshold in zip(materialized_grads, thresholds)]
         #all_gradients = sparsified
     all_gradients = com.gather(materialized_grads, root=0)
     if rank == 0:
