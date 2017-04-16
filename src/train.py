@@ -27,7 +27,13 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
         percentile_cutoff = .90
         thresholds = [np.percentile(x, percentile_cutoff) for x in materialized_grads]
         sparsified = [x * (x > threshold) for x, threshold in zip(materialized_grads, thresholds)]
-        all_gradients = [sparse.coo_matrix(x) for x in sparsified]
+
+        for i, sparse_grad in enumerate(sparsified):
+            non_compressed_array = io.BytesIO()
+            compressed_array = io.BytesIO()
+            np.savez_compressed(compressed_array, sparse_grad)
+            np.savez_compressed(compressed_array, materialized_grads[i])
+            print("%d vs %d" % (len(compressed_array.getvalue()), len(non_compressed_array.getvalue())))
     length = -1
     #if rank != 0:
     #    length = int(len(materialized_grads) / 4)
