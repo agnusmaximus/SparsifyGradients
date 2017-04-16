@@ -25,16 +25,12 @@ tf.app.flags.DEFINE_bool('sparsify', True,
 
 def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
     if FLAGS.sparsify and rank != 0:
-        percentile_cutoff = 1
+        percentile_cutoff = .9
         thresholds = [np.percentile(x, percentile_cutoff) for x in materialized_grads]
         sparsified = [x * (x > threshold) for x, threshold in zip(materialized_grads, thresholds)]
         sparsified_flatten = [x.flatten() for x in sparsified]
-        all_gradients = [sparse.csr_matrix(x) for x in sparsified_flatten]
-
-    length = -1
-    if rank != 0:
-        length = int(len(materialized_grads) / 2)
-    all_gradients = com.gather(materialized_grads[:length], root=0)
+        materialized_grads = [sparse.csr_matrix(x) for x in sparsified_flatten]
+    all_gradients = com.gather(materialized_grads, root=0)
     if rank == 0:
         for worker in range(1, n_workers):
             print("Master applying gradients for worker %d" % worker)
