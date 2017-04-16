@@ -17,10 +17,12 @@ from mpi4py import MPI
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_float('learning_rate', .1,
+tf.app.flags.DEFINE_float('learning_rate', 1,
                           """Constant learning rate""")
 tf.app.flags.DEFINE_integer('num_epochs', 10,
                             """Number of passes of data""")
+tf.app.flags.DEFINE_integer('evaluate_batchsize', 100,
+                            """Batchsize for evaluation""")
 
 def main(argv=None):
     cifar10.maybe_download_and_extract()

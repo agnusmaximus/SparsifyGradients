@@ -18,6 +18,14 @@ from mpi4py import MPI
 
 FLAGS = tf.app.flags.FLAGS
 
+def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
+    all_gradients = com.gather(materialized_grads, root=0)
+    if rank == 0:
+        for worker in range(1, n_workers):
+            print("Master applying gradients for worker %d" % worker)
+            fd = {apply_gradients_placeholder[i] : all_gradients[worker][i] for i in range(len(apply_gradients_placeholder))}
+            sess.run(apply_gradients_op, feed_dict=fd)
+
 def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
     materialized_variables = []
     if rank == 0:
@@ -34,6 +42,7 @@ def synchronize_model(sess, variables, com, rank, assignment_op, placeholders):
         print("Worker setting variables")
         assert(len(materialized_variables) == len(placeholders))
         feed_dict = {placeholders[i] : materialized_variables[i] for i in range(len(placeholders))}
+        print("YOO:", np.linalg.norm(materialized_variables[0]))
         sess.run(assignment_op, feed_dict=feed_dict)
 
 def get_next_batch(fractional_images, fractional_labels, cur_index, batch_size):
@@ -77,9 +86,12 @@ def train():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
-    addr = socket.gethostbyname(socket.gethostname())
 
-    print("Worker %d with address %s" % (rank, str(addr)))
+    try:
+        addr = socket.gethostbyname(socket.gethostname())
+        print("Worker %d with address %s" % (rank, str(addr)))
+    except:
+        pass
 
     # Load data set
     images_train_raw, labels_train_raw, images_test_raw, labels_test_raw = cifar10_input.load_cifar_data_raw(rank)
@@ -95,12 +107,15 @@ def train():
         labels = tf.placeholder(tf.int32, shape=(None,))
         logits = cifar10.inference(images)
         loss_op = cifar10.loss(logits, labels, scope_name)
-        train_op, grads_op = cifar10.train(loss_op, scope_name)
+        train_op, grads_and_vars, opt = cifar10.train(loss_op, scope_name)
         top_k_op = tf.nn.in_top_k(logits, labels, 1)
 
     model_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope_name)
     model_variables_placeholders = [tf.placeholder(dtype=x.dtype, shape=x.get_shape()) for x in model_variables]
     model_variables_assign = [tf.assign(model_variables[i], model_variables_placeholders[i]) for i in range(len(model_variables))]
+
+    apply_gradients_placeholders = [tf.placeholder(dtype=grad.dtype, shape=grad.get_shape()) for grad, var in grads_and_vars]
+    apply_gradients_op = opt.apply_gradients(zip(apply_gradients_placeholders, [var for grad, var in grads_and_vars]))
 
     with tf.Session() as sess:
 
@@ -108,12 +123,53 @@ def train():
         tf.train.start_queue_runners(sess=sess)
 
         get_feed_dict.fractional_dataset_index = 0
+        n_examples_processed = 0
+        iteration = 0
+        eval_iteration_interval = cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / (FLAGS.batch_size * (size-1))
+        eval_iteration_interval = 5
+        evaluate_times = []
+        t_start = time.time()
 
         while True:
+
+            if rank == 0:
+                print("Epoch: %f" % (n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN))
+
             # Synchronize model
             synchronize_model(sess, model_variables, comm, rank, model_variables_assign, model_variables_placeholders)
 
+            if iteration % eval_iteration_interval == 0:
+
+                # Evaluate on master
+                if rank == 0 and iteration != 0:
+                    print("Master evaluating...")
+                    acc_total, loss_total = 0, 0
+                    evaluate_t_start = time.time()
+                    for i in range(0, cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL, FLAGS.evaluate_batchsize):
+                        print("%d of %d" % (i, cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL))
+                        fd = get_feed_dict(FLAGS.evaluate_batchsize, images_test_raw, labels_test_raw, images, labels)
+                        acc_p, loss_p = sess.run([top_k_op, loss_op], feed_dict=fd)
+                        acc_total += np.sum(acc_p)
+                        loss_total += loss_p
+                    evaluate_t_end = time.time()
+                    evaluate_times.append(evaluate_t_end-evaluate_t_start)
+                    acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+                    loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+                    print("Time: %f, Accuracy: %f, Loss: %f" % (time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
+                comm.Barrier()
+
             # Perform distributed gradient descent
+            materialized_gradients = None
             if rank != 0:
                 fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
-                materialized_gradients = sess.run([grads_op], feed_dict=fd)
+                materialized_gradients = sess.run([x[0] for x in grads_and_vars], feed_dict=fd)
+
+                #for grad in materialized_gradients:
+                #    flattened = sorted(list(grad.flatten()), key=lambda x : abs(x))
+                    #for perc in [.1, .5, .8, .9, .95, .99, 1]:
+                    #    print("Percentile: %f" % perc, flattened[int((len(flattened)-1) * perc)])
+
+            aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op)
+
+            n_examples_processed += (size-1) * FLAGS.batch_size
+            iteration += 1
