@@ -19,7 +19,7 @@ from mpi4py import MPI
 FLAGS = tf.app.flags.FLAGS
 
 def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
-    all_gradients = com.gather(materialized_grads, root=0)
+    #all_gradients = com.gather(materialized_grads, root=0)
     if rank == 0:
         for worker in range(1, n_workers):
             print("Master applying gradients for worker %d" % worker)
