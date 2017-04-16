@@ -149,9 +149,9 @@ def train():
         evaluate_times = []
         t_start = time.time()
 
-        sync_variables_times = []
-        accumulate_gradients_times = []
-        compute_times = []
+        sync_variables_times = 0
+        accumulate_gradients_times = 0
+        compute_times = 0
 
         for i in range(FLAGS.n_iterations):
 
@@ -164,9 +164,18 @@ def train():
             t_synchronize_start = time.time()
             synchronize_model(sess, model_variables, comm, rank, model_variables_assign, model_variables_placeholders)
             t_synchronize_end = time.time()
-            sync_variables_times.append(t_synchronize_end-t_synchronize_start)
+            sync_variables_times += t_synchronize_end-t_synchronize_start
 
             if iteration % eval_iteration_interval == 0:
+
+
+                if rank == 0:
+                    mean_sync = sync_variables_times / iteration
+                    mean_compute = compute_times / iteration
+                    mean_acc_gradients = accumulate_gradients_times / iteration
+                    print("Mean sync time: %f" % mean_sync)
+                    print("Mean compute time: %f" % mean_compute)
+                    print("Mean acc gradients time: %f" % mean_acc_gradients)
 
                 # Evaluate on master
                 if rank == 0 and iteration != 0:
@@ -180,7 +189,7 @@ def train():
                         acc_total += np.sum(acc_p)
                         loss_total += loss_p
                     evaluate_t_end = time.time()
-                    evaluate_times.append(evaluate_t_end-evaluate_t_start)
+                    evaluate_times += evaluate_t_end-evaluate_t_start
                     acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
                     loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
                     print("Epoch: %f, Time: %f, Accuracy: %f, Loss: %f" % (cur_epoch, time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
@@ -193,10 +202,6 @@ def train():
                 fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
                 materialized_gradients = sess.run([x[0] for x in grads_and_vars], feed_dict=fd)
 
-                #for grad in materialized_gradients:
-                #    flattened = sorted(list(grad.flatten()), key=lambda x : abs(x))
-                    #for perc in [.1, .5, .8, .9, .95, .99, 1]:
-                    #    print("Percentile: %f" % perc, flattened[int((len(flattened)-1) * perc)])
             comm.Barrier()
             t_compute_end = time.time()
             compute_times.append(t_compute_end-t_compute_start)
@@ -204,15 +209,7 @@ def train():
             t_accumulate_gradients_start = time.time()
             aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op)
             t_accumulate_gradients_end = time.time()
-            accumulate_gradients_times.append(t_accumulate_gradients_end-t_accumulate_gradients_start)
-
-            if rank == 0:
-                mean_sync = sum(sync_variables_times) / len(sync_variables_times)
-                mean_compute = sum(compute_times) / len(compute_times)
-                mean_acc_gradients = sum(accumulate_gradients_times) / len(accumulate_gradients_times)
-                print("Mean sync time: %f" % mean_sync)
-                print("Mean compute time: %f" % mean_compute)
-                print("Mean acc gradients time: %f" % mean_acc_gradients)
+            accumulate_gradients_times += t_accumulate_gradients_end-t_accumulate_gradients_start
 
             n_examples_processed += (size-1) * FLAGS.batch_size
             iteration += 1
