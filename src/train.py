@@ -188,7 +188,7 @@ def train():
                         acc_total += np.sum(acc_p)
                         loss_total += loss_p
                     evaluate_t_end = time.time()
-                    evaluate_times += evaluate_t_end-evaluate_t_start
+                    evaluate_times.append(evaluate_t_end-evaluate_t_start)
                     acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
                     loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
                     print("Epoch: %f, Time: %f, Accuracy: %f, Loss: %f" % (cur_epoch, time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
@@ -203,7 +203,7 @@ def train():
 
             comm.Barrier()
             t_compute_end = time.time()
-            compute_times.append(t_compute_end-t_compute_start)
+            compute_times += t_compute_end-t_compute_start
 
             t_accumulate_gradients_start = time.time()
             aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op)
