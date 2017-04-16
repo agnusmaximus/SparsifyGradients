@@ -31,13 +31,12 @@ tf.app.flags.DEFINE_integer('n_iterations', 10000000,
 
 def get_variable_cutoff(vals):
     perc = 75 + 24 / (1 + 100 * np.e**(np.percentile(vals, FLAGS.cutoff) * 100))
-    print(perc)
     return int(perc)
 
 def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op):
     if FLAGS.sparsify and rank != 0:
         if FLAGS.variable_cutoff:
-            thresholds = [get_variable_cutoff(abs(x)) for x in materialized_grads]
+            thresholds = [np.percentile(abs(x), get_variable_cutoff(abs(x))) for x in materialized_grads]
         else:
             thresholds = [np.percentile(abs(x), FLAGS.cutoff) for x in materialized_grads]
         sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
@@ -172,15 +171,15 @@ def train():
             if rank == 0 and iteration % 100 == 0:
                 print("Epoch: %f" % (cur_epoch))
 
-            if iteration % eval_iteration_interval == 0:
+            if rank == 0:
+                mean_sync = sync_variables_times / (iteration+1)
+                mean_compute = compute_times / (iteration+1)
+                mean_acc_gradients = accumulate_gradients_times / (iteration+1)
+                print("Mean sync time: %f" % mean_sync)
+                print("Mean compute time: %f" % mean_compute)
+                print("Mean acc gradients time: %f" % mean_acc_gradients)
 
-                if rank == 0:
-                    mean_sync = sync_variables_times / (iteration+1)
-                    mean_compute = compute_times / (iteration+1)
-                    mean_acc_gradients = accumulate_gradients_times / (iteration+1)
-                    print("Mean sync time: %f" % mean_sync)
-                    print("Mean compute time: %f" % mean_compute)
-                    print("Mean acc gradients time: %f" % mean_acc_gradients)
+            if iteration % eval_iteration_interval == 0:
 
                 # Evaluate on master
                 if rank == 0:
