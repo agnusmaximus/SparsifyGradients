@@ -23,7 +23,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_bool('sparsify', True,
                          """To sparsify gradients""")
 
-tf.app.flags.DEFINE_bool('cutoff', 90,
+tf.app.flags.DEFINE_integer('cutoff', 90,
                          """To sparsify gradients""")
 
 
