@@ -27,10 +27,10 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
         percentile_cutoff = .90
         thresholds = [np.percentile(x, percentile_cutoff) for x in materialized_grads]
         sparsified = [x * (x > threshold) for x, threshold in zip(materialized_grads, thresholds)]
-        all_gradients = sparsified
+        all_gradients = [sparse.coo_matrix(x) for x in sparsified]
     length = -1
-    if rank != 0:
-        length = int(len(materialized_grads) / 4)
+    #if rank != 0:
+    #    length = int(len(materialized_grads) / 4)
     all_gradients = com.gather(materialized_grads[:length], root=0)
     if rank == 0:
         for worker in range(1, n_workers):
