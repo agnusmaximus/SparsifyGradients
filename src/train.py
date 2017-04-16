@@ -33,7 +33,7 @@ def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materia
             non_compressed_array = io.BytesIO()
             compressed_array = io.BytesIO()
             np.savez_compressed(compressed_array, sparse_grad)
-            np.savez_compressed(compressed_array, materialized_grads[i])
+            np.savez_compressed(non_compressed_array, materialized_grads[i])
             print("%d vs %d" % (len(compressed_array.getvalue()), len(non_compressed_array.getvalue())))
     length = -1
     #if rank != 0:
