@@ -178,7 +178,7 @@ def train():
 
             # Perform distributed gradient descent
             t_compute_start = time.time()
-            materialized_gradients = None
+            materialized_gradients = []
             if rank != 0:
                 fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
                 materialized_gradients = sess.run([x[0] for x in grads_and_vars], feed_dict=fd)
