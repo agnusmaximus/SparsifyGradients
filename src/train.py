@@ -13,6 +13,7 @@ import sys
 import tensorflow as tf
 import cifar10
 import cifar10_input
+import io
 import pickle
 from scipy import sparse
 from mpi4py import MPI
