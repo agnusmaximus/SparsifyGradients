@@ -1,4 +1,4 @@
-% Created 2017-04-17 Mon 02:13
+% Created 2017-04-17 Mon 10:49
 \documentclass[10pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -36,9 +36,9 @@
 We present SparsifyGradients, a simple algorithm to drop 90\% of
 gradient values during distributed machine learning training. We show
 that the increase in network performance by dropping these values
-outweigh the loss in precision, leading to an overall speedup in
+outweighs the loss in accuracy, leading to an overall speedup in
 training. We show up to 2x speedup over non-sparsified training on 14
-c3.xlarge EC2 machines on training a cuda-convnet neural network for
+c3.xlarge EC2 machines for training a cuda-convnet neural network for
 the cifar10 image classification task.
 
 \section{Introduction}
@@ -110,38 +110,71 @@ for the cifar10 task. The c3.xlarge machines are CPU instances with
 7.5 GiB of memory and 4 virtual cpus, connected by a 500 Mbps network
 channel. We use Tensorflow as a blackbox to evaluate and train the
 neural network and MPI for communication between machines, which uses
-the TCP protocol underneath. Our experiments compare sparsifying
-gradients with a 90 percentile cutoff against the default
-non-sparsified setting. We use a batch size of 8 per worker when
-training the cuda convnet neural network.
+the TCP protocol underneath. Model synchronization uses the MPI
+broadcast routine, while gradient aggregation uses the MPI gather
+routine. Since the MPI broadcast is implemented using an optimized
+tree-based communication algorithm, while the MPI gather uses a naive
+algorithm, the gradient aggregation phase accounts for most of the
+network bottleneck. Our experiments compare sparsifying gradients with
+a 90 percentile cutoff against the default non-sparsified setting. We
+use a batch size of 8 per worker when training the cuda convnet neural
+network.
+
+\newpage
 
 \section{Results and Discussion}
 \label{sec-5}
 
-We achieve around a 2x speedup in time to .995 training accuracy on
-training a cuda-convnet style neural network to perform the cifar10
-image classification task. As expected, dropping 90\% of the gradient
+We achieve around a 2x speedup in time to .995 training accuracy on 14
+c3.xlarge ec2 machines to train a cuda-convnet style neural network.
+
+\begin{center}
+\includegraphics[height=0.35\textwidth]{./figures/SparsifyTimeVsAccuracy.png}
+\includegraphics[height=0.35\textwidth]{./figures/SparsifyTimeVsLoss.png}
+\end{center}
+\begin{figure}[htb]
+\centering
+\includegraphics[height=0.35\textwidth]{./figures/SparsifyTimeUntilAccuracy.png}
+\caption{SparsifyGradients achieves around a 2x speedup in time to 99.5\% training accuracy while training a cuda-convnet neural network.}
+\end{figure}
+
+\noindent
+As expected, dropping 90\% of the gradient
 values and converting to sparse format greatly reduces the time needed
 to perform the gradient aggregation phase, which is mostly network
-bandwidth bottlenecked. It is important to note that dropping 90\% of
-values only decreases communication time by a factor of around 3-4 due
-to the format of the sparse matrix, which stores indices along with
-its values. Figure x compares the convergence properties of sparsified
-vs non-sparsified distributed training. As expected, dropping gradient
-values hurts convergence, though this loss in precision is compensated
-by the speedup in network communication. It is interesting to note
-that although 90\% of gradients' values are zeroed out, convergence to
-99.5\% training accuracy is still achieved in a comparable number of
-passes of data. We believe there are a couple of reasons for
-this. Firstly, we believe that most gradient values do not change
-model parameters too much and can be seen as noise. Figure x shows a
-histogram of the absolute values of a gradient for the cuda convnet
-model. As shown, most values are close to 0 and hence have a lesser
-effect on the model. Secondly, we believe that if a gradient value
-falls below the threshold in one iteration, but is essential to an accurate
-model, then in a subsequent iteration the magnitude of that gradient
-value will rise above the threshold to compensate. Further
-investigation into these two points is future research.
+bandwidth bottlenecked. This in turn allows data to be processed faster.
+
+\begin{center}
+\includegraphics[height=0.35\textwidth]{./figures/SparsifyTimeToPerformGradientAggregation.png}
+\includegraphics[height=0.35\textwidth]{./figures/SparsifyTimeVsEpoch.png}
+\end{center}
+
+\noindent
+It is important to note that dropping 90\% of values only decreases
+communication time by a factor of around 2-3 due to the format of the
+sparse matrix, which stores indices along with its values.
+
+\begin{center}
+\includegraphics[height=0.35\textwidth]{./figures/EpochVsAccuracy.png}
+\includegraphics[height=0.35\textwidth]{./figures/EpochVsLoss.png}
+\end{center}
+
+\noindent The figures above compare the convergence properties of
+sparsified vs non-sparsified distributed training. As expected,
+dropping gradient values hurts convergence, though this loss in
+accuracy is compensated by the speedup in network communication. It
+is interesting to note that although 90\% of gradients' values are
+zeroed out, convergence to 99.5\% training accuracy is still achieved
+in a comparable number of passes of data. We believe there are a
+couple of reasons for this. Firstly, we believe that most gradient
+values do not change model parameters too much and can be seen as
+noise. A histogram of the absolute values of the gradients for the
+cuda convnet model show that most values are close to zero. Secondly,
+we believe that if a gradient value falls below the threshold in one
+iteration, but is essential to an accurate model, then in some subsequent
+iteration the magnitude of that gradient value will rise above the
+threshold to compensate. Further investigation into these two points
+is future research.
 
 \section{Conclusion}
 \label{sec-6}
@@ -190,7 +223,7 @@ opted to use MPI for communication and Tensorflow as an optimization black box.
 \\
 Finally, as we have demonstrated that gradient values might be dropped
 without much penalty, it would be interesting to implement the full
-training procedure using UDP instead of TCP and simply ignoring the
+training procedure using UDP instead of TCP and simply ignore the
 lost packets. Due to time constraints and the complexity of managing a
 lower level of the network model, we were not able to explore this.
 
