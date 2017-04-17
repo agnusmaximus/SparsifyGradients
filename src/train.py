@@ -3,7 +3,10 @@ from __future__ import division
 from __future__ import print_function
 from datetime import datetime
 
+import matplotlib
+matplotlib.use('Agg')
 import time
+import matplotlib.pyplot as plt
 import socket
 import binascii
 import subprocess
@@ -22,6 +25,8 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_bool('sparsify', True,
                          """To sparsify gradients""")
+tf.app.flags.DEFINE_bool('save_gradient_magnitude_histogram', False,
+                         """Save gradient magnitude histogram""")
 tf.app.flags.DEFINE_bool('variable_cutoff', True,
                          """To sparsify gradients""")
 tf.app.flags.DEFINE_integer('cutoff', 90,
@@ -172,7 +177,7 @@ def train():
         for i in range(FLAGS.n_iterations):
 
             cur_epoch = n_examples_processed / cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
-            
+
             if cur_epoch >= FLAGS.n_epochs:
                 break
 
@@ -223,6 +228,24 @@ def train():
             if rank != 0:
                 fd = get_feed_dict(FLAGS.batch_size, images_train_raw, labels_train_raw, images, labels)
                 materialized_gradients = sess.run([x[0] for x in grads_and_vars], feed_dict=fd)
+
+                # Save gradients on a particular worker
+                if rank == 1 and FLAGS.save_gradient_magnitude_histogram:
+                    if iteration == 0:
+                        print("Plotting gradient magnitude histograms")
+                        plt.cla()
+                        figs, axes = plt.subplots(nrows=2, ncols=5, figsize=(15*3,15))
+                        axes = axes.flatten()
+                        for i, (gradient, variable) in enumerate(zip(materialized_gradients, [x[1] for x in grads_and_vars])):
+                            vname = variable.name.replace("/","_")
+                            name = "iteration_%d_gradient_%s" % (iteration, vname)
+                            title = "Layer %s" % vname
+                            magnitudes = [abs(x) for x in list(gradient.flatten())]
+                            axes[i].hist(magnitudes, bins='auto')
+                            axes[i].set_title(title, fontsize=30)
+                        figs.tight_layout()
+                        plt.savefig("SparsifyHistogramOfGradientMagnitudes.png")
+                        print("Done!")
 
             comm.Barrier()
             t_compute_end = time.time()
