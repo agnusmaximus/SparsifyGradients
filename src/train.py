@@ -28,25 +28,30 @@ tf.app.flags.DEFINE_integer('cutoff', 90,
                             """To sparsify gradients""")
 tf.app.flags.DEFINE_integer('n_iterations', 10000000,
                             """Num iterations""")
-tf.app.flags.DEFINE_integer('n_epochs', 10,
+tf.app.flags.DEFINE_integer('n_epochs', 100000,
                             """Num iterations""")
+tf.app.flags.DEFINE_float('accuracy_to_reach', .995, "Accuracy to reach")
 
-def get_variable_cutoff(vals, epoch):
-    if epoch <= 2:
+def get_variable_cutoff(vals, percent_acc):
+    if percent_acc <= .80:
         return 90
-    else:
-        return 75
-    return int(perc)
+    return 80
 
-def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op, epoch):
+def get_variable_sparsified_grads(materialized_grads, percent_acc):
+    thresholds = [np.percentile(abs(x), get_variable_cutoff(abs(x), percent_acc)) for x in materialized_grads]
+    sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
+    sparsified_flatten = [x.flatten() for x in sparsified]
+    return [sparse.csr_matrix(x) for x in sparsified_flatten]
+
+def aggregate_and_apply_gradients(sess, variables, com, rank, n_workers, materialized_grads, apply_gradients_placeholder, apply_gradients_op, percent_acc):
     if FLAGS.sparsify and rank != 0:
         if FLAGS.variable_cutoff:
-            thresholds = [np.percentile(abs(x), get_variable_cutoff(abs(x), epoch)) for x in materialized_grads]
+            materialized_grads = get_variable_sparsified_grads(materialized_grads, percent_acc)
         else:
             thresholds = [np.percentile(abs(x), FLAGS.cutoff) for x in materialized_grads]
-        sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
-        sparsified_flatten = [x.flatten() for x in sparsified]
-        materialized_grads = [sparse.csr_matrix(x) for x in sparsified_flatten]
+            sparsified = [x * (abs(x) > threshold) for x, threshold in zip(materialized_grads, thresholds)]
+            sparsified_flatten = [x.flatten() for x in sparsified]
+            materialized_grads = [sparse.csr_matrix(x) for x in sparsified_flatten]
 
     all_gradients = com.gather(materialized_grads, root=0)
     if rank == 0:
@@ -162,6 +167,7 @@ def train():
         sync_variables_times = 0
         accumulate_gradients_times = 0
         compute_times = 0
+        previous_accuracy = 0
 
         for i in range(FLAGS.n_iterations):
 
@@ -204,7 +210,11 @@ def train():
                     evaluate_times.append(evaluate_t_end-evaluate_t_start)
                     acc_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
                     loss_total /= cifar10.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+                    previous_accuracy = acc_total
                     print("Epoch: %f, Time: %f, Accuracy: %f, Loss: %f" % (cur_epoch, time.time() - sum(evaluate_times) - t_start, acc_total, loss_total))
+
+                    if acc_total >= FLAGS.accuracy_to_reach:
+                        break
                 comm.Barrier()
 
             # Perform distributed gradient descent
@@ -219,7 +229,7 @@ def train():
             compute_times += t_compute_end-t_compute_start
 
             t_accumulate_gradients_start = time.time()
-            aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op, int(cur_epoch))
+            aggregate_and_apply_gradients(sess, model_variables, comm, rank, size, materialized_gradients, apply_gradients_placeholders, apply_gradients_op, previous_accuracy)
             t_accumulate_gradients_end = time.time()
             accumulate_gradients_times += t_accumulate_gradients_end-t_accumulate_gradients_start
 
