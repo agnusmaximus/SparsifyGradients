@@ -135,19 +135,25 @@ sparse matrix, which stores indices along with its values.
 \noindent The figures above compare the convergence properties of
 sparsified vs non-sparsified distributed training. As expected,
 dropping gradient values hurts convergence, though this loss in
-accuracy is compensated by the speedup in network communication. It
-is interesting to note that although 90% of gradients' values are
-zeroed out, convergence to 99.5% training accuracy is still achieved
-in a comparable number of passes of data. We believe there are a
-couple of reasons for this. Firstly, we believe that most gradient
-values do not change model parameters too much and can be seen as
-noise. A histogram of the absolute values of the gradients for the
-cuda convnet model show that most values are close to zero. Secondly,
-we believe that if a gradient value falls below the threshold in one
-iteration, but is essential to an accurate model, then in some subsequent
-iteration the magnitude of that gradient value will rise above the
-threshold to compensate. Further investigation into these two points
-is future research.
+accuracy is compensated by the speedup in network communication. It is
+interesting to note that although 90% of gradients' values are zeroed
+out, convergence to 99.5% training accuracy is still achieved in a
+comparable number of passes of data. We believe there are a couple of
+reasons for this. Firstly, we believe that most gradient values do not
+change model parameters too much and can be seen as noise, and that
+training is propelled by a few select gradient values. Histograms of
+the absolute values of the gradients for the cuda convnet model show
+that gradient values follow a normal distribution, with many values
+close to 0.
+
+#+CAPTION: Histograms of gradient magnitudes for each layer of the cuda-convnet model. The histograms follow a normal distribution, implying that only a few percentage of gradient values make a significant impact on training. We believe that the top 10 percent of gradient values account for most of the training convergence, while the rest can be seen as noise.
+[[./figures/SparsifyHistogramOfGradientMagnitudes.png]]
+
+\noindent Secondly, we believe that if a gradient value falls
+below the threshold in one iteration, but is essential to an accurate
+model, then in some subsequent iteration the magnitude of that
+gradient value will rise above the threshold to compensate. Further
+investigation into these two points is future research.
 
 * Conclusion
 
@@ -155,12 +161,14 @@ We present SparsifyGradients, a method which drops gradient values to
 reduce network communication load. We tested our algorithm on a
 cluster of 14 machines and trained a cuda-convnet model in a process
 where 90% of the lowest magnitude gradient weights are dropped. Doing
-so achieves around 2x speedup over the default in time to 99.5%
-training accuracy. Finally, to explain the relative intactness of
-convergence while dropping 90% of gradient weights, we propose two
-explanations. Firstly, that most gradient values are small and can be
-seen as noise. Secondly, that important gradient values that fail the
-threshold limit eventually succeed due to a delayed compensation mechanism.
+so achieves around a 2x speedup over the default in time to 99.5%
+training accuracy. To explain the relative intactness of convergence
+while dropping 90% of gradient weights, we propose two
+explanations. Firstly, that most gradient values can be seen as noise and
+that only a few select gradient values are responsible for
+convergence. Secondly, that important gradient values that fail the
+threshold limit eventually succeed due to a delayed compensation
+mechanism.
 
 * Future Work
 
