@@ -206,5 +206,10 @@ training procedure using UDP instead of TCP and simply ignore the
 lost packets. Due to time constraints and the complexity of managing a
 lower level of the network model, we were not able to explore this.
 
+* Update
+As of 4/14/2017, we found out that this idea has been explored by
+Fikri Aji et al. in https://arxiv.org/abs/1704.05021 with similar
+results.
+
 * Code
 https://github.com/agnusmaximus/SparsifyGradients
